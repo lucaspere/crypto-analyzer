@@ -1,5 +1,5 @@
 [workspace]
-members = ["feed-handler"]
+members = ["feed-handler", "nats-checker"]
 resolver = "2"
 version = "0.1.0"
 
