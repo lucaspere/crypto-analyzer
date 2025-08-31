@@ -1,0 +1,13 @@
+[package]
+name = "analytics-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = {workspace = true}
+tonic = {workspace = true}
+
+serde = {workspace = true}
+
+[build-dependencies]
+tonic-prost-build = "0.14.1"

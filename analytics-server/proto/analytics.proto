@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package analytics;
+import "google/protobuf/timestamp.proto";
+
+service AnalyticsService {
+    rpc GetTradeAnalytics(GetTradeAnalyticsRequest) returns (GetTradeAnalyticsResponse);
+}
+
+message GetTradeAnalyticsRequest {
+    string symbol = 1;
+    google.protobuf.Timestamp start_timestamp = 2;
+    google.protobuf.Timestamp end_timestamp = 3;
+}
+
+message GetTradeAnalyticsResponse {
+    double total_volume_in_quotes = 1; // e.g: volume total in USDT
+    double vwap = 2; // Medium price ponderated by volume
+    uint64 trades_count = 3; // Total number of trades in the period
+}
