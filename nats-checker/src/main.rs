@@ -3,13 +3,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Trade {
-    #[serde(rename = "s")]
     symbol: String,
-    #[serde(rename = "p")]
     price: String,
-    #[serde(rename = "q")]
     quantity: String,
-    #[serde(rename = "T")]
     timestamp: u64,
 }
 

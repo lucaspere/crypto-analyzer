@@ -1,0 +1,11 @@
+[package]
+name = "clickhouse_sink"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = {workspace = true}
+serde_json = {workspace = true}
+clickhouse = {workspace = true}
+rdkafka = {workspace = true}
+tokio = {workspace = true}

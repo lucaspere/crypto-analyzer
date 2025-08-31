@@ -6,13 +6,13 @@ use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Trade {
-    #[serde(rename = "s")]
+    #[serde(rename(deserialize = "s"))]
     symbol: String,
-    #[serde(rename = "p")]
+    #[serde(rename(deserialize = "p"))]
     price: String,
-    #[serde(rename = "q")]
+    #[serde(rename(deserialize= "q"))]
     quantity: String,
-    #[serde(rename = "T")]
+    #[serde(rename(deserialize = "T"))]
     timestamp: u64,
 }
 
