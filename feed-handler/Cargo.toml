@@ -1,0 +1,15 @@
+[package]
+name = "feed-handler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = {workspace = true}
+tokio-tungstenite = { version = "0.27.0", features = ["native-tls"] }
+serde = {workspace = true}
+
+serde_json = {workspace = true}
+async-nats = {workspace = true}
+
+futures-util = {workspace = true}
+url = "2.5.7"
