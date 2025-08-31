@@ -14,3 +14,6 @@ rdkafka = { version = "0.38.0", features = ["tokio", "cmake-build"] }
 clickhouse = "0.13.3"
 prost = "0.14.1"
 tonic = "0.14.1"
+tonic-prost = "0.14.1"
+prost-types = "0.14.1"
+chrono = "0.4.41"

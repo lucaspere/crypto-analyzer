@@ -1,22 +1,45 @@
+use chrono::Utc;
 use futures_util::StreamExt;
+use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
+use tokio_tungstenite::tungstenite;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-use tokio_tungstenite::tungstenite::Message;
 
+mod data {
+    include!(concat!(env!("OUT_DIR"), "/data.rs"));
+}
 #[derive(Debug, Deserialize, Serialize)]
-struct Trade {
+struct BinanceTrade {
     #[serde(rename(deserialize = "s"))]
     symbol: String,
     #[serde(rename(deserialize = "p"))]
     price: String,
-    #[serde(rename(deserialize= "q"))]
+    #[serde(rename(deserialize = "q"))]
     quantity: String,
     #[serde(rename(deserialize = "T"))]
     timestamp: u64,
 }
 
-impl Display for Trade {
+impl From<BinanceTrade> for data::Trade {
+    fn from(value: BinanceTrade) -> Self {
+        let now = Utc::now();
+        let seconds = now.timestamp();
+        let nanos = now.timestamp_subsec_nanos();
+        Self {
+            symbol: value.symbol,
+            price: value.price.parse().unwrap_or_default(),
+            quantity: value.quantity.parse().unwrap_or_default(),
+            exchange_timestamp: value.timestamp,
+            ingestion_timestamp: Some(prost_types::Timestamp {
+                seconds,
+                nanos: nanos as i32,
+            }),
+        }
+    }
+}
+
+impl Display for BinanceTrade {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -45,20 +68,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     while let Some(msg) = stream.next().await {
         match msg {
-            Ok(Message::Text(text)) => match serde_json::from_str::<Trade>(&text) {
-                Ok(trade) => {
-                    let payload = serde_json::to_vec(&trade)?;
-                    nats_client
-                        .publish(nats_subject.to_string(), payload.into())
-                        .await?;
+            Ok(tungstenite::Message::Text(text)) => {
+                match serde_json::from_str::<BinanceTrade>(&text) {
+                    Ok(trade) => {
+                        let payload: data::Trade = trade.into();
+                        let payload = payload.encode_to_vec();
+                        nats_client
+                            .publish(nats_subject.to_string(), payload.into())
+                            .await?;
 
-                    println!(
-                        "Published trade for {}: Price: {}",
-                        trade.symbol, trade.price
-                    )
+                        println!("Published trade")
+                    }
+                    Err(e) => eprintln!("Error: {}", e),
                 }
-                Err(e) => eprintln!("Error: {}", e),
-            },
+            }
             Ok(msg) => {
                 println!("Got message: {:?}", msg);
             }

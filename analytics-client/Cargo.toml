@@ -7,8 +7,9 @@ edition = "2024"
 clap = { version = "4.5.46", features = ["derive"] }
 tonic = {workspace = true}
 tokio = {workspace = true}
-tonic-prost = "0.14.1"
-prost = "0.14.1"
-prost-types = "0.14.1"
+tonic-prost = {workspace = true}
+prost = {workspace = true}
+prost-types = {workspace = true}
+
 [build-dependencies]
 tonic-prost-build = "0.14.1"

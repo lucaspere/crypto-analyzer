@@ -3,7 +3,7 @@ use std::sync::Arc;
 use clickhouse::Client;
 use clickhouse::query::RowCursor;
 use datafusion::arrow::array::{
-    Array, Datum, Float64Array, Int64Array, RecordBatch, TimestampNanosecondArray, UInt64Array,
+    Array, Float64Array, Int64Array, RecordBatch, TimestampNanosecondArray,
 };
 use datafusion::prelude::SessionContext;
 use tonic::{Request, Response, Status, transport::Server};
@@ -82,7 +82,7 @@ impl AnalyticsService for AnalyticsServiceHandler {
             ("price", Arc::new(Float64Array::from(prices)) as _),
             ("quantity", Arc::new(Float64Array::from(quantities)) as _),
         ])
-        .map_err(|e| Status::internal("Error creating batch"))?;
+        .map_err(|_e| Status::internal("Error creating batch"))?;
 
         let ctx = SessionContext::new();
         ctx.register_batch("trades_mem", batch)

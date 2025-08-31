@@ -698,7 +698,10 @@ checksum = "c469d952047f47f91b68d1cba3f10d63c11d73e4636f24f08daf0278abf01c4d"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
+ "serde",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -766,6 +769,7 @@ checksum = "9a9a81a1dffadd762ee662635ce409232258ce9beebd7cc0fa227df0b5e7efc0"
 dependencies = [
  "bstr",
  "bytes",
+ "chrono",
  "cityhash-rs",
  "clickhouse-derive",
  "futures",
@@ -799,11 +803,15 @@ dependencies = [
 name = "clickhouse_sink"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "clickhouse",
+ "prost",
+ "prost-types",
  "rdkafka",
  "serde",
  "serde_json",
  "tokio",
+ "tonic-prost-build",
 ]
 
 [[package]]
@@ -1709,12 +1717,15 @@ name = "feed-handler"
 version = "0.1.0"
 dependencies = [
  "async-nats",
+ "chrono",
  "futures-util",
+ "prost",
+ "prost-types",
  "serde",
  "serde_json",
  "tokio",
  "tokio-tungstenite",
- "url",
+ "tonic-prost-build",
 ]
 
 [[package]]
@@ -2521,9 +2532,12 @@ version = "0.1.0"
 dependencies = [
  "async-nats",
  "futures-util",
+ "prost",
+ "prost-types",
  "serde",
  "serde_json",
  "tokio",
+ "tonic-prost-build",
 ]
 
 [[package]]

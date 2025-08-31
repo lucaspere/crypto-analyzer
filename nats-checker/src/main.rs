@@ -1,12 +1,8 @@
 use futures_util::StreamExt;
-use serde::{Deserialize, Serialize};
+use prost::Message;
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Trade {
-    symbol: String,
-    price: String,
-    quantity: String,
-    timestamp: u64,
+mod data {
+    include!(concat!(env!("OUT_DIR"), "/data.rs"));
 }
 
 #[tokio::main]
@@ -18,7 +14,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut subscriptions = nats_client.subscribe(nats_subject.to_string()).await?;
 
     while let Some(msg) = subscriptions.next().await {
-        if let Ok(trade) = serde_json::from_slice::<Trade>(&msg.payload) {
+        let bytes = msg.payload.to_vec();
+        if let Ok(trade) = data::Trade::decode(&bytes[..]) {
             println!("Received Trade: {:?}", trade);
         } else {
             eprintln!("Failed to deserialized message: {:?}", msg.payload);
