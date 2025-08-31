@@ -1,0 +1,11 @@
+[package]
+name = "nats_to_kafka_bridge"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = {workspace = true}
+async-nats = {workspace = true}
+futures-util = {workspace = true}
+
+rdkafka = {workspace = true}

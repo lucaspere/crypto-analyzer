@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 
@@ -25,8 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     while let Some(msg) = subscriptions.next().await {
         if let Ok(trade) = serde_json::from_slice::<Trade>(&msg.payload) {
             println!("Received Trade: {:?}", trade);
-        } else
-        {
+        } else {
             eprintln!("Failed to deserialized message: {:?}", msg.payload);
         }
     }
