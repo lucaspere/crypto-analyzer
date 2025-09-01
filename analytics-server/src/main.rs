@@ -13,36 +13,21 @@ mod analytics {
 }
 
 use analytics::analytics_service_server::{AnalyticsService, AnalyticsServiceServer};
-use analytics::{GetTradeAnalyticsRequest, GetTradeAnalyticsResponse};
+use analytics::{GetTradeAnalyticsRequest, GetTradeAnalyticsResponse, GetMovingAverageRequest, GetMovingAverageResponse};
 
 pub struct AnalyticsServiceHandler {
     clickhouse_client: Client,
 }
 
-#[tonic::async_trait]
-impl AnalyticsService for AnalyticsServiceHandler {
-    async fn get_trade_analytics(
-        &self,
-        request: Request<GetTradeAnalyticsRequest>,
-    ) -> Result<Response<GetTradeAnalyticsResponse>, Status> {
-        let req = request.into_inner();
-
-        println!("Received request for symbol {}", req.symbol);
-
-        let query = "SELECT timestamp, CAST(price, 'Float64'), CAST(quantity, 'Float64')
+impl AnalyticsServiceHandler {
+    async fn fetch_trades(&self, req: GetTradeAnalyticsRequest) -> Result<(Vec<u64>, Vec<f64>, Vec<f64>), Status> {
+        let query = "SELECT exchange_timestamp, price, quantity
              FROM default.trades
-             WHERE symbol = ? AND timestamp >= ? AND timestamp <= ?"
-            .to_string();
-
+             WHERE symbol = ? AND exchange_timestamp >= ? AND exchange_timestamp <= ?".to_string();
         let start_timestamp_millis = req.start_timestamp.as_ref().map(|t| t.seconds * 1000);
         let end_timestamp_millis = req.end_timestamp.as_ref().map(|t| t.seconds * 1000);
-
         #[derive(Debug, serde::Deserialize, clickhouse::Row)]
-        struct Row {
-            timestamp: u64,
-            price: f64,
-            quantity: f64,
-        }
+        struct Row { exchange_timestamp: u64, price: f64, quantity: f64 }
         let mut cursor: RowCursor<Row> = self
             .clickhouse_client
             .query(&query)
@@ -51,43 +36,40 @@ impl AnalyticsService for AnalyticsServiceHandler {
             .bind(end_timestamp_millis)
             .fetch()
             .map_err(|e| Status::internal(format!("Error fetching data: {}", e)))?;
-
         let mut timestamps = Vec::new();
         let mut prices = Vec::new();
         let mut quantities = Vec::new();
         while let Some(row) = cursor
             .next()
             .await
-            .map_err(|e| Status::internal(format!("Error fetching row: {}", e)))?
-        {
-            let timestamp_nanos: u64 = row.timestamp * 1_000_000;
+            .map_err(|e| Status::internal(format!("Error fetching row: {}", e)))? {
+            let timestamp_nanos: u64 = row.exchange_timestamp * 1_000_000;
             timestamps.push(timestamp_nanos);
             prices.push(row.price);
             quantities.push(row.quantity);
         }
-
         if timestamps.is_empty() {
-            return Err(Status::not_found(
-                "No data found for the given symbol and timestamp range",
-            ));
+            return Err(Status::not_found("No data found for the given symbol and timestamp range"));
         }
+        Ok((timestamps, prices, quantities))
+    }
 
-        let batch = RecordBatch::try_from_iter(vec![
+    fn build_record_batch(timestamps: Vec<u64>, prices: Vec<f64>, quantities: Vec<f64>) -> Result<RecordBatch, Status> {
+        RecordBatch::try_from_iter(vec![
             (
                 "timestamp",
-                Arc::new(TimestampNanosecondArray::from_iter_values(
-                    timestamps.iter().map(|t| *t as i64),
-                )) as _,
+                Arc::new(TimestampNanosecondArray::from_iter_values(timestamps.iter().map(|t| *t as i64))) as _,
             ),
             ("price", Arc::new(Float64Array::from(prices)) as _),
             ("quantity", Arc::new(Float64Array::from(quantities)) as _),
         ])
-        .map_err(|_e| Status::internal("Error creating batch"))?;
+        .map_err(|_e| Status::internal("Error creating batch"))
+    }
 
+    async fn compute_analytics(batch: RecordBatch) -> Result<(f64, f64, u64), Status> {
         let ctx = SessionContext::new();
         ctx.register_batch("trades_mem", batch)
             .map_err(|e| Status::internal(format!("Error registering batch: {}", e)))?;
-
         let df = ctx
             .sql(
                 "SELECT
@@ -98,12 +80,10 @@ impl AnalyticsService for AnalyticsServiceHandler {
             )
             .await
             .map_err(|e| Status::internal(format!("Error executing query: {}", e)))?;
-
         let results = df
             .collect()
             .await
             .map_err(|e| Status::internal(format!("Error collecting results: {}", e)))?;
-
         let result_batch = results
             .first()
             .ok_or_else(|| Status::internal("Analysis returned no rows"))?;
@@ -128,12 +108,29 @@ impl AnalyticsService for AnalyticsServiceHandler {
             .downcast_ref::<Int64Array>()
             .unwrap()
             .value(0) as u64;
+        Ok((total_volume_in_quotes, vwap, trades_count))
+    }
+}
 
-        Ok(Response::new(GetTradeAnalyticsResponse {
-            total_volume_in_quotes,
-            vwap,
-            trades_count,
-        }))
+#[tonic::async_trait]
+impl AnalyticsService for AnalyticsServiceHandler {
+    async fn get_trade_analytics(
+        &self,
+        request: Request<GetTradeAnalyticsRequest>,
+    ) -> Result<Response<GetTradeAnalyticsResponse>, Status> {
+        let req = request.into_inner();
+        println!("Received request for symbol {}", req.symbol);
+        let (timestamps, prices, quantities) = self.fetch_trades(req).await?;
+        let batch = AnalyticsServiceHandler::build_record_batch(timestamps, prices, quantities)?;
+        let (total_volume_in_quotes, vwap, trades_count) = AnalyticsServiceHandler::compute_analytics(batch).await?;
+        Ok(Response::new(GetTradeAnalyticsResponse { total_volume_in_quotes, vwap, trades_count }))
+    }
+
+    async fn get_moving_average(
+        &self,
+        _request: Request<GetMovingAverageRequest>,
+    ) -> Result<Response<GetMovingAverageResponse>, Status> {
+        Err(Status::unimplemented("get_moving_average not implemented in this refactor"))
     }
 }
 

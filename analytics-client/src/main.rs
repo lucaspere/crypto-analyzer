@@ -28,7 +28,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Connecting to analytics server...");
     let mut client = AnalyticsServiceClient::connect("http://[::1]:50051").await?;
     println!("Connected!");
-    dbg!(&cli);
     let request = tonic::Request::new(GetTradeAnalyticsRequest {
         symbol: cli.symbol.clone(),
         start_timestamp: Some(Timestamp {
