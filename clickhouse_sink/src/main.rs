@@ -14,6 +14,34 @@ mod data {
     include!(concat!(env!("OUT_DIR"), "/data.rs"));
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+enum Exchange {
+    Unknown = 0,
+    Binance = 1,
+    Coinbase = 2,
+}
+
+impl From<data::trade::Exchange> for Exchange {
+    fn from(value: data::trade::Exchange) -> Self {
+        match value {
+            data::trade::Exchange::Unknown => Self::Unknown,
+            data::trade::Exchange::Binance => Self::Binance,
+            data::trade::Exchange::Coinbase => Self::Coinbase,
+        }
+    }
+}
+
+impl From<i32> for Exchange {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => Self::Unknown,
+            1 => Self::Binance,
+            2 => Self::Coinbase,
+            _ => Self::Unknown,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, Row)]
 struct Trade {
     symbol: String,
@@ -22,6 +50,7 @@ struct Trade {
     exchange_timestamp: u64,
     /// nanoseconds
     ingestion_timestamp: Option<u64>,
+    exchange: Exchange,
 }
 
 impl From<data::Trade> for Trade {
@@ -38,6 +67,7 @@ impl From<data::Trade> for Trade {
 
                 seconds_as_nanos + nanos
             }),
+            exchange: value.exchange.into(),
         }
     }
 }
@@ -49,6 +79,7 @@ impl From<Trade> for data::Trade {
             price: value.price,
             quantity: value.quantity,
             exchange_timestamp: value.exchange_timestamp,
+            exchange: value.exchange as i32,
             ingestion_timestamp: value.ingestion_timestamp.map(|t| prost_types::Timestamp {
                 seconds: t as i64 / 1_000_000_000,
                 nanos: (t % 1_000_000_000) as i32,
