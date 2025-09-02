@@ -301,7 +301,7 @@ impl AnalyticsService for AnalyticsServiceHandler {
             .subscribe(subject)
             .await
             .map_err(|e| Status::internal(format!("Error subscribing to subject: {}", e)))?;
-        let x = async_stream::stream! {
+        let trade_stream = async_stream::stream! {
             while let Some(msg) = subscription.next().await {
                 if let Ok(trade) = data::Trade::decode(&msg.payload[..]) {
                     yield Ok(trade);
@@ -309,7 +309,7 @@ impl AnalyticsService for AnalyticsServiceHandler {
             }
         };
 
-        Ok(Response::new(Box::pin(x)))
+        Ok(Response::new(Box::pin(trade_stream)))
     }
 }
 
