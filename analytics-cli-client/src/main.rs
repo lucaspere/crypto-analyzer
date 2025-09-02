@@ -1,3 +1,4 @@
+use chrono::DateTime;
 use clap::Parser;
 use clap::Subcommand;
 use prost_types::Timestamp;
@@ -59,6 +60,13 @@ enum Commands {
         #[arg(long, default_value_t = 9)]
         signal_period: u32,
     },
+}
+
+fn format_timestamp_us(us: u64) -> String {
+    let seconds = (us / 1_000_000) as i64;
+    let nanoseconds = (us % 1_000_000 * 1000) as u32;
+    let dt = DateTime::from_timestamp(seconds, nanoseconds).unwrap_or_default();
+    dt.format("%Y-%m-%d %H:%M:%S.%3f").to_string()
 }
 
 #[tokio::main]
@@ -130,7 +138,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{:<28} | {:<15}", "Timestamp", "SMA Value");
             println!("------------------------------------");
             for point in data.points.iter().skip(500).take(10) {
-                println!("{:<28} | {:<15.2}", point.timestamp, point.value);
+                println!(
+                    "{:<28} | {:<15.2}",
+                    format_timestamp_us(point.timestamp),
+                    point.value
+                );
             }
             println!("------------------------------------");
             println!("Total points calculated: {}", data.points.len());
@@ -182,7 +194,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             for point in data.points.iter().skip(500).take(10) {
                 println!(
                     "{:<28} | {:<15.2} | {:<15.2} | {:<15.2}",
-                    point.timestamp, point.macd_line, point.signal_line, point.histogram
+                    format_timestamp_us(point.timestamp),
+                    point.macd_line,
+                    point.signal_line,
+                    point.histogram
                 );
             }
             println!("------------------------------------");

@@ -43,8 +43,12 @@ impl AnalyticsServiceHandler {
              FROM default.trades
              WHERE symbol = ? AND exchange_timestamp >= ? AND exchange_timestamp <= ?"
             .to_string();
-        let start_timestamp_millis = req.start_timestamp.as_ref().map(|t| t.seconds * 1000);
-        let end_timestamp_millis = req.end_timestamp.as_ref().map(|t| t.seconds * 1000);
+        let start_timestamp_micro = req.start_timestamp.as_ref().map(|t| t.seconds * 1000_000);
+        let end_timestamp_micro = req.end_timestamp.as_ref().map(|t| t.seconds * 1000_000);
+        println!(
+            "[fetch_trades] Querying trades for symbol: {} from {:?} to {:?}",
+            req.symbol, start_timestamp_micro, end_timestamp_micro
+        );
         #[derive(Debug, serde::Deserialize, clickhouse::Row)]
         struct Row {
             exchange_timestamp: u64,
@@ -55,8 +59,8 @@ impl AnalyticsServiceHandler {
             .clickhouse_client
             .query(&query)
             .bind(req.symbol)
-            .bind(start_timestamp_millis)
-            .bind(end_timestamp_millis)
+            .bind(start_timestamp_micro)
+            .bind(end_timestamp_micro)
             .fetch()
             .map_err(|e| Status::internal(format!("Error fetching data: {}", e)))?;
         let mut timestamps = Vec::new();
@@ -67,8 +71,7 @@ impl AnalyticsServiceHandler {
             .await
             .map_err(|e| Status::internal(format!("Error fetching row: {}", e)))?
         {
-            let timestamp_nanos: u64 = row.exchange_timestamp * 1_000_000;
-            timestamps.push(timestamp_nanos);
+            timestamps.push(row.exchange_timestamp);
             prices.push(row.price);
             quantities.push(row.quantity);
         }
@@ -89,7 +92,7 @@ impl AnalyticsServiceHandler {
             (
                 "timestamp",
                 Arc::new(TimestampNanosecondArray::from_iter_values(
-                    timestamps.iter().map(|t| *t as i64),
+                    timestamps.iter().map(|t| *t as i64 * 1000),
                 )) as _,
             ),
             ("price", Arc::new(Float64Array::from(prices)) as _),
@@ -147,8 +150,15 @@ impl AnalyticsServiceHandler {
         &self,
         request: GetMacdRequest,
     ) -> Result<(Vec<u64>, Vec<f64>), Status> {
-        let start_timestamp_millis = request.start_timestamp.as_ref().map(|t| t.seconds * 1000);
-        let end_timestamp_millis = request.end_timestamp.as_ref().map(|t| t.seconds * 1000);
+        let start_timestamp_micro = request
+            .start_timestamp
+            .as_ref()
+            .map(|t| t.seconds * 1000_000);
+        let end_timestamp_micro = request.end_timestamp.as_ref().map(|t| t.seconds * 1000_000);
+        println!(
+            "[fetch_macd_data] Querying for symbol: {} from {:?} to {:?}",
+            request.symbol, start_timestamp_micro, end_timestamp_micro
+        );
         let query = format!(
             "SELECT exchange_timestamp, price
              FROM default.trades
@@ -164,8 +174,8 @@ impl AnalyticsServiceHandler {
             .clickhouse_client
             .query(&query)
             .bind(request.symbol)
-            .bind(start_timestamp_millis)
-            .bind(end_timestamp_millis)
+            .bind(start_timestamp_micro)
+            .bind(end_timestamp_micro)
             .fetch()
             .map_err(|e| Status::internal(format!("Error fetching data: {}", e)))?;
         let mut timestamps = Vec::<u64>::new();
@@ -175,8 +185,7 @@ impl AnalyticsServiceHandler {
             .await
             .map_err(|e| Status::internal(format!("Error fetching row: {}", e)))?
         {
-            let timestamp_nano = row.exchange_timestamp * 1_000_000;
-            timestamps.push(timestamp_nano);
+            timestamps.push(row.exchange_timestamp);
             prices.push(row.price);
         }
         Ok((timestamps, prices))
@@ -225,18 +234,22 @@ impl AnalyticsService for AnalyticsServiceHandler {
             request.symbol, request.window_size
         );
 
-        let start_timestamp_millis = request.start_timestamp.as_ref().map(|t| {
+        let start_timestamp_micro = request.start_timestamp.as_ref().map(|t| {
             let seconds = t.seconds;
             let nanos = t.nanos;
-            let millis = seconds * 1000 + nanos as i64 / 1_000_000;
-            millis
+            let micro = seconds * 1000_000 + nanos as i64 / 1_000;
+            micro
         });
-        let end_timestamp_millis = request.end_timestamp.map(|t| {
+        let end_timestamp_micro = request.end_timestamp.map(|t| {
             let seconds = t.seconds;
             let nanos = t.nanos;
-            let millis = seconds * 1000 + nanos as i64 / 1_000_000;
-            millis
+            let micro = seconds * 1000_000 + nanos as i64 / 1_000;
+            micro
         });
+        println!(
+            "[get_moving_average] Querying for symbol: {} from {:?} to {:?}",
+            request.symbol, start_timestamp_micro, end_timestamp_micro
+        );
         let query = format!(
             "SELECT exchange_timestamp, price
              FROM default.trades
@@ -253,8 +266,8 @@ impl AnalyticsService for AnalyticsServiceHandler {
             .clickhouse_client
             .query(&query)
             .bind(request.symbol)
-            .bind(start_timestamp_millis)
-            .bind(end_timestamp_millis)
+            .bind(start_timestamp_micro)
+            .bind(end_timestamp_micro)
             .fetch()
             .map_err(|e| Status::internal(format!("Error fetching data: {}", e)))?;
         let mut timestamps = Vec::<u64>::new();
@@ -264,8 +277,7 @@ impl AnalyticsService for AnalyticsServiceHandler {
             .await
             .map_err(|e| Status::internal(format!("Error fetching row: {}", e)))?
         {
-            let timestamp_nano = row.exchange_timestamp * 1_000_000;
-            timestamps.push(timestamp_nano);
+            timestamps.push(row.exchange_timestamp);
             prices.push(row.price);
         }
 
@@ -279,7 +291,7 @@ impl AnalyticsService for AnalyticsServiceHandler {
             (
                 "timestamp",
                 Arc::new(TimestampNanosecondArray::from_iter_values(
-                    timestamps.iter().map(|t| *t as i64),
+                    timestamps.iter().map(|t| *t as i64 * 1000),
                 )) as _,
             ),
             ("price", Arc::new(Float64Array::from(prices)) as _),
@@ -329,7 +341,7 @@ impl AnalyticsService for AnalyticsServiceHandler {
             for i in 0..result.num_rows() {
                 if smas.is_valid(i) {
                     points.push(MovingAverageDataPoint {
-                        timestamp: timestamp.value(i) as u64,
+                        timestamp: timestamp.value(i) as u64 / 1000,
                         value: smas.value(i),
                     });
                 }
@@ -350,18 +362,22 @@ impl AnalyticsService for AnalyticsServiceHandler {
         );
 
         let window_size = request.window_size as usize;
-        let start_timestamp_millis = request.start_timestamp.as_ref().map(|t| {
+        let start_timestamp_micro = request.start_timestamp.as_ref().map(|t| {
             let seconds = t.seconds;
             let nanos = t.nanos;
-            let millis = seconds * 1000 + nanos as i64 / 1_000_000;
-            millis
+            let micro = seconds * 1000_000 + nanos as i64 / 1_000;
+            micro
         });
-        let end_timestamp_millis = request.end_timestamp.map(|t| {
+        let end_timestamp_micro = request.end_timestamp.map(|t| {
             let seconds = t.seconds;
             let nanos = t.nanos;
-            let millis = seconds * 1000 + nanos as i64 / 1_000_000;
-            millis
+            let micro = seconds * 1000_000 + nanos as i64 / 1_000;
+            micro
         });
+        println!(
+            "[get_ema] Querying for symbol: {} from {:?} to {:?}",
+            request.symbol, start_timestamp_micro, end_timestamp_micro
+        );
         let query = format!(
             "SELECT exchange_timestamp, price
              FROM default.trades
@@ -377,8 +393,8 @@ impl AnalyticsService for AnalyticsServiceHandler {
             .clickhouse_client
             .query(&query)
             .bind(request.symbol)
-            .bind(start_timestamp_millis)
-            .bind(end_timestamp_millis)
+            .bind(start_timestamp_micro)
+            .bind(end_timestamp_micro)
             .fetch()
             .map_err(|e| Status::internal(format!("Error fetching data: {}", e)))?;
         let mut timestamps = Vec::<u64>::new();
@@ -388,8 +404,7 @@ impl AnalyticsService for AnalyticsServiceHandler {
             .await
             .map_err(|e| Status::internal(format!("Error fetching row: {}", e)))?
         {
-            let timestamp_nano = row.exchange_timestamp * 1_000_000;
-            timestamps.push(timestamp_nano);
+            timestamps.push(row.exchange_timestamp);
             prices.push(row.price);
         }
 
