@@ -22,12 +22,12 @@ mod data {
 
 use analytics::analytics_service_server::AnalyticsService;
 use analytics::{
-    GetMovingAverageRequest, GetMovingAverageResponse, GetTradeAnalyticsRequest,
-    GetTradeAnalyticsResponse, SubscribeToTradesRequest,
+    GetMacdRequest, GetMacdResponse, GetMovingAverageRequest, GetMovingAverageResponse,
+    GetTradeAnalyticsRequest, GetTradeAnalyticsResponse, SubscribeToTradesRequest,
 };
 
-use crate::analytics::MovingAverageDataPoint;
 use crate::analytics::analytics_service_server::AnalyticsServiceServer;
+use crate::analytics::{MacdDataPoint, MovingAverageDataPoint};
 
 pub struct AnalyticsServiceHandler {
     clickhouse_client: Client,
@@ -141,6 +141,58 @@ impl AnalyticsServiceHandler {
             .unwrap()
             .value(0) as u64;
         Ok((total_volume_in_quotes, vwap, trades_count))
+    }
+
+    async fn fetch_macd_data(
+        &self,
+        request: GetMacdRequest,
+    ) -> Result<(Vec<u64>, Vec<f64>), Status> {
+        let start_timestamp_millis = request.start_timestamp.as_ref().map(|t| t.seconds * 1000);
+        let end_timestamp_millis = request.end_timestamp.as_ref().map(|t| t.seconds * 1000);
+        let query = format!(
+            "SELECT exchange_timestamp, price
+             FROM default.trades
+             WHERE symbol = ? AND exchange_timestamp >= ? AND exchange_timestamp <= ?
+             ORDER BY exchange_timestamp",
+        );
+        #[derive(Debug, serde::Deserialize, clickhouse::Row)]
+        struct Row {
+            exchange_timestamp: u64,
+            price: f64,
+        }
+        let mut cursor: RowCursor<Row> = self
+            .clickhouse_client
+            .query(&query)
+            .bind(request.symbol)
+            .bind(start_timestamp_millis)
+            .bind(end_timestamp_millis)
+            .fetch()
+            .map_err(|e| Status::internal(format!("Error fetching data: {}", e)))?;
+        let mut timestamps = Vec::<u64>::new();
+        let mut prices = Vec::<f64>::new();
+        while let Some(row) = cursor
+            .next()
+            .await
+            .map_err(|e| Status::internal(format!("Error fetching row: {}", e)))?
+        {
+            let timestamp_nano = row.exchange_timestamp * 1_000_000;
+            timestamps.push(timestamp_nano);
+            prices.push(row.price);
+        }
+        Ok((timestamps, prices))
+    }
+
+    fn calculate_ema(&self, prices: &[f64], window_size: usize) -> Vec<f64> {
+        let mut ema = Vec::new();
+        let multiplier = 2.0 / (window_size as f64 + 1.0);
+        let first_sma = prices.iter().take(window_size).sum::<f64>() / window_size as f64;
+        ema.push(first_sma);
+        for price in prices.iter().skip(window_size) {
+            let last_ema = ema.last().unwrap();
+            let new_ema = (price * multiplier) + (last_ema * (1.0 - multiplier));
+            ema.push(new_ema);
+        }
+        ema
     }
 }
 
@@ -393,6 +445,58 @@ impl AnalyticsService for AnalyticsServiceHandler {
         };
 
         Ok(Response::new(Box::pin(trade_stream)))
+    }
+
+    async fn get_macd(
+        &self,
+        request: Request<GetMacdRequest>,
+    ) -> Result<Response<GetMacdResponse>, Status> {
+        let request = request.into_inner();
+        let signal_period = request.signal_period as usize;
+        let slow_period = request.slow_period as usize;
+        let fast_period = request.fast_period as usize;
+        println!(
+            "Received MACD request for symbol {} with fast period {}, slow period {}, and signal period {}",
+            request.symbol, request.fast_period, request.slow_period, request.signal_period
+        );
+
+        let (timestamps, prices) = self.fetch_macd_data(request).await?;
+        if prices.len() < slow_period as usize {
+            return Err(Status::invalid_argument("Not enough data to compute MACD"));
+        }
+
+        let ema_fast = self.calculate_ema(&prices, fast_period);
+        let ema_slow = self.calculate_ema(&prices, slow_period);
+        let aligned_ema_fast = &ema_fast[fast_period - 1..];
+
+        let macd_line: Vec<f64> = aligned_ema_fast
+            .iter()
+            .zip(ema_slow.iter())
+            .map(|(fast, slow)| fast - slow)
+            .collect();
+
+        let signal_line = self.calculate_ema(&macd_line, signal_period);
+        let aligned_macd_line = &macd_line[signal_period - 1..];
+        let histogram: Vec<f64> = aligned_macd_line
+            .iter()
+            .zip(signal_line.iter())
+            .map(|(signal, macd)| signal - macd)
+            .collect();
+
+        let points = timestamps
+            .into_iter()
+            .skip((slow_period + signal_period - 2) as usize)
+            .zip(aligned_macd_line.iter())
+            .zip(signal_line.iter())
+            .zip(histogram.iter())
+            .map(|(((timestamp, macd), signal), histogram)| MacdDataPoint {
+                timestamp: timestamp * 1000 as u64,
+                macd_line: *macd,
+                signal_line: *signal,
+                histogram: *histogram,
+            })
+            .collect();
+        Ok(Response::new(GetMacdResponse { points }))
     }
 }
 

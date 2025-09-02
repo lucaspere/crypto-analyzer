@@ -9,6 +9,7 @@ service AnalyticsService {
     rpc GetTradeAnalytics(GetTradeAnalyticsRequest) returns (GetTradeAnalyticsResponse);
     rpc GetMovingAverage(GetMovingAverageRequest) returns (GetMovingAverageResponse);
     rpc GetEma(GetMovingAverageRequest) returns (GetMovingAverageResponse);
+    rpc GetMacd(GetMacdRequest) returns (GetMacdResponse);
     rpc SubscribeToTrades(SubscribeToTradesRequest) returns (stream data.Trade);
 }
 
@@ -19,9 +20,9 @@ message GetTradeAnalyticsRequest {
 }
 
 message GetTradeAnalyticsResponse {
-    double total_volume_in_quotes = 1; // e.g: volume total in USDT
-    double vwap = 2; // Medium price ponderated by volume
-    uint64 trades_count = 3; // Total number of trades in the period
+    double total_volume_in_quotes = 1;
+    double vwap = 2;
+    uint64 trades_count = 3;
 }
 
 message SubscribeToTradesRequest {
@@ -32,7 +33,7 @@ message GetMovingAverageRequest {
     string symbol = 1;
     google.protobuf.Timestamp start_timestamp = 2;
     google.protobuf.Timestamp end_timestamp = 3;
-    uint32 window_size = 4; // The number of periods to include in the moving average (e.g 20 to a SMA 20 periods)
+    uint32 window_size = 4;
 }
 
 message MovingAverageDataPoint {
@@ -42,4 +43,24 @@ message MovingAverageDataPoint {
 
 message GetMovingAverageResponse {
     repeated MovingAverageDataPoint points = 1;
+}
+
+message GetMacdRequest {
+    string symbol = 1;
+    google.protobuf.Timestamp start_timestamp = 2;
+    google.protobuf.Timestamp end_timestamp = 3;
+    uint32 fast_period = 4;
+    uint32 slow_period = 5;
+    uint32 signal_period = 6;
+}
+
+message MacdDataPoint {
+    uint64 timestamp = 1;
+    double macd_line = 2;
+    double signal_line = 3;
+    double histogram = 4;
+}
+
+message GetMacdResponse {
+    repeated MacdDataPoint points = 1;
 }
