@@ -7,12 +7,14 @@ mod data {
     include!(concat!(env!("OUT_DIR"), "/data.rs"));
 }
 
+type FeedHandler = Box<dyn FeedSource + Send + Sync>;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let nats_client = async_nats::connect("nats://localhost:4222").await?;
     println!("[Main] Connected to NATS");
 
-    let handlers: Vec<(Box<dyn FeedSource + Send + Sync>, &str)> = vec![
+    let handlers: Vec<(FeedHandler, &str)> = vec![
         (Box::new(BinanceSource), "BTCUSDT"),
         (Box::new(CoinbaseSource), "BTC-USD"),
     ];

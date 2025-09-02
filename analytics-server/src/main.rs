@@ -287,6 +287,89 @@ impl AnalyticsService for AnalyticsServiceHandler {
         Ok(Response::new(GetMovingAverageResponse { points }))
     }
 
+    async fn get_ema(
+        &self,
+        request: Request<GetMovingAverageRequest>,
+    ) -> Result<Response<GetMovingAverageResponse>, Status> {
+        let request = request.into_inner();
+        println!(
+            "Received EMA request for symbol {} with window size {}",
+            request.symbol, request.window_size
+        );
+
+        let window_size = request.window_size as usize;
+        let start_timestamp_millis = request.start_timestamp.as_ref().map(|t| {
+            let seconds = t.seconds;
+            let nanos = t.nanos;
+            let millis = seconds * 1000 + nanos as i64 / 1_000_000;
+            millis
+        });
+        let end_timestamp_millis = request.end_timestamp.map(|t| {
+            let seconds = t.seconds;
+            let nanos = t.nanos;
+            let millis = seconds * 1000 + nanos as i64 / 1_000_000;
+            millis
+        });
+        let query = format!(
+            "SELECT exchange_timestamp, price
+             FROM default.trades
+             WHERE symbol = ? AND exchange_timestamp >= ? AND exchange_timestamp <= ?
+             ORDER BY exchange_timestamp",
+        );
+        #[derive(Debug, serde::Deserialize, clickhouse::Row)]
+        struct Row {
+            exchange_timestamp: u64,
+            price: f64,
+        }
+        let mut cursor: RowCursor<Row> = self
+            .clickhouse_client
+            .query(&query)
+            .bind(request.symbol)
+            .bind(start_timestamp_millis)
+            .bind(end_timestamp_millis)
+            .fetch()
+            .map_err(|e| Status::internal(format!("Error fetching data: {}", e)))?;
+        let mut timestamps = Vec::<u64>::new();
+        let mut prices = Vec::<f64>::new();
+        while let Some(row) = cursor
+            .next()
+            .await
+            .map_err(|e| Status::internal(format!("Error fetching row: {}", e)))?
+        {
+            let timestamp_nano = row.exchange_timestamp * 1_000_000;
+            timestamps.push(timestamp_nano);
+            prices.push(row.price);
+        }
+
+        if prices.len() < window_size {
+            return Err(Status::invalid_argument("Not enough data to compute EMA"));
+        }
+
+        let mut ema = Vec::new();
+        let multiplier = 2.0 / (window_size as f64 + 1.0);
+
+        let first_sma = prices.iter().take(window_size).sum::<f64>() / window_size as f64;
+
+        ema.push(first_sma);
+
+        for price in prices.iter().skip(window_size) {
+            let last_ema = ema.last().unwrap();
+            let new_ema = (price * multiplier) + (last_ema * (1.0 - multiplier));
+            ema.push(new_ema);
+        }
+
+        let points = timestamps
+            .iter()
+            .zip(ema.iter())
+            .map(|(timestamp, value)| MovingAverageDataPoint {
+                timestamp: *timestamp * 1000 as u64,
+                value: *value,
+            })
+            .collect();
+
+        Ok(Response::new(GetMovingAverageResponse { points }))
+    }
+
     type SubscribeToTradesStream = BoxStream<'static, Result<data::Trade, Status>>;
     async fn subscribe_to_trades(
         &self,

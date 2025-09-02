@@ -8,6 +8,7 @@ import "trade.proto";
 service AnalyticsService {
     rpc GetTradeAnalytics(GetTradeAnalyticsRequest) returns (GetTradeAnalyticsResponse);
     rpc GetMovingAverage(GetMovingAverageRequest) returns (GetMovingAverageResponse);
+    rpc GetEma(GetMovingAverageRequest) returns (GetMovingAverageResponse);
     rpc SubscribeToTrades(SubscribeToTradesRequest) returns (stream data.Trade);
 }
 
