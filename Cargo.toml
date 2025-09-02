@@ -1,5 +1,5 @@
 [workspace]
-members = [ "analytics-client", "analytics-server", "clickhouse_sink","feed-handler", "nats-checker", "nats_to_kafka_bridge"]
+members = ["analytics-cli-client", "analytics-server", "clickhouse_sink","feed-handler", "nats-checker", "nats_to_kafka_bridge"]
 resolver = "2"
 version = "0.1.0"
 
