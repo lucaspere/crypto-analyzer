@@ -8,6 +8,12 @@ message Trade {
     string symbol = 1;
     double price = 2;
     double quantity = 3;
-    uint64 exchange_timestamp = 4;
-    google.protobuf.Timestamp ingestion_timestamp = 5;
+    enum Exchange {
+        UNKNOWN = 0;
+        BINANCE = 1;
+        COINBASE = 2;
+    }
+    Exchange exchange = 4;
+    uint64 exchange_timestamp = 5;
+    google.protobuf.Timestamp ingestion_timestamp = 6;
 }
