@@ -1,4 +1,4 @@
-# My implementation of one of [Polygon Techinal Indicator](https://polygon.io/docs/rest/crypto/technical-indicators/simple-moving-average)
+# My implementation of one of [Polygon Technical Indicator](https://polygon.io/docs/rest/crypto/technical-indicators/simple-moving-average)
 ## Architecture Overview
 
 The system follows a modern data pipeline architecture with both real-time (hot path) and batch (cold path) processing:
