@@ -46,7 +46,7 @@ enum Commands {
         symbol: String,
     },
     Macd {
-        #[arg(short, long)]
+        #[arg(long)]
         symbol: String,
         #[arg(long)]
         start_timestamp: u64,
@@ -54,9 +54,9 @@ enum Commands {
         end_timestamp: u64,
         #[arg(short, long, default_value_t = 12)]
         fast_period: u32,
-        #[arg(short, long, default_value_t = 26)]
+        #[arg(long, default_value_t = 26)]
         slow_period: u32,
-        #[arg(short, long, default_value_t = 9)]
+        #[arg(long, default_value_t = 9)]
         signal_period: u32,
     },
 }

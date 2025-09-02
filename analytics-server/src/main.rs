@@ -414,7 +414,7 @@ impl AnalyticsService for AnalyticsServiceHandler {
             .iter()
             .zip(ema.iter())
             .map(|(timestamp, value)| MovingAverageDataPoint {
-                timestamp: *timestamp * 1000 as u64,
+                timestamp: *timestamp,
                 value: *value,
             })
             .collect();
@@ -487,7 +487,7 @@ impl AnalyticsService for AnalyticsServiceHandler {
             .zip(signal_line.iter())
             .zip(histogram.iter())
             .map(|(((timestamp, macd), signal), histogram)| MacdDataPoint {
-                timestamp: timestamp * 1000 as u64,
+                timestamp: timestamp,
                 macd_line: *macd,
                 signal_line: *signal,
                 histogram: *histogram,
