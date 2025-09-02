@@ -1,7 +1,4 @@
-# Analytics Technical Indicators
-
-A command-line interface client for the real-time cryptocurrency trade analytics system. This client allows you to request various financial indicators (VWAP, SMA, MACD) and subscribe to live trade data streams.
-
+# My implementation of one of [Polygon Techinal Indicator](https://polygon.io/docs/rest/crypto/technical-indicators/simple-moving-average)
 ## Architecture Overview
 
 The system follows a modern data pipeline architecture with both real-time (hot path) and batch (cold path) processing:
