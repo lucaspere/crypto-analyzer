@@ -1,3 +1,5 @@
+use crate::data;
+
 use super::FeedSource;
 use async_nats::Client as NatsClient;
 use async_trait::async_trait;
@@ -30,6 +32,7 @@ impl From<BinanceTrade> for crate::data::Trade {
             symbol: value.symbol,
             price: value.price.parse().unwrap_or_default(),
             quantity: value.quantity.parse().unwrap_or_default(),
+            exchange: data::trade::Exchange::Binance.into(),
             exchange_timestamp: value.timestamp,
             ingestion_timestamp: Some(prost_types::Timestamp {
                 seconds,

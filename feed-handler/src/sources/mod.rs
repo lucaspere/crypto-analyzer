@@ -1,4 +1,5 @@
 pub mod binance;
+pub mod coinbase;
 
 use async_nats::Client as NatsClient;
 use async_trait::async_trait;
