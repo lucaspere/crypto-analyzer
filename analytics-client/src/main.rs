@@ -10,7 +10,7 @@ pub mod data {
     tonic::include_proto!("data");
 }
 use crate::analytics::{
-    GetMovingAverageRequest, GetTradeAnalyticsRequest, SubscribeToTradesRequest,
+    GetMacdRequest, GetMovingAverageRequest, GetTradeAnalyticsRequest, SubscribeToTradesRequest,
 };
 use analytics::analytics_service_client::AnalyticsServiceClient;
 
@@ -44,6 +44,20 @@ enum Commands {
     Subscribe {
         #[arg(short, long)]
         symbol: String,
+    },
+    Macd {
+        #[arg(short, long)]
+        symbol: String,
+        #[arg(long)]
+        start_timestamp: u64,
+        #[arg(long)]
+        end_timestamp: u64,
+        #[arg(short, long, default_value_t = 12)]
+        fast_period: u32,
+        #[arg(short, long, default_value_t = 26)]
+        slow_period: u32,
+        #[arg(short, long, default_value_t = 9)]
+        signal_period: u32,
     },
 }
 
@@ -133,6 +147,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Received trade: {:?}", trade);
             }
             println!("Stream closed!");
+        }
+        Commands::Macd {
+            symbol,
+            start_timestamp,
+            end_timestamp,
+            fast_period,
+            slow_period,
+            signal_period,
+        } => {
+            let request = tonic::Request::new(GetMacdRequest {
+                start_timestamp: Some(Timestamp {
+                    seconds: start_timestamp as i64,
+                    nanos: 0,
+                }),
+                end_timestamp: Some(Timestamp {
+                    seconds: end_timestamp as i64,
+                    nanos: 0,
+                }),
+                fast_period: fast_period as u32,
+                slow_period: slow_period as u32,
+                signal_period: signal_period as u32,
+                symbol: symbol.clone(),
+            });
+            let response = client.get_macd(request).await?;
+            let data = response.into_inner();
+            println!("\n✅ MACD Analysis Complete! (showing first 10 points)");
+            println!("------------------------------------");
+            println!(
+                "{:<28} | {:<15} | {:<15} | {:<15}",
+                "Timestamp", "MACD Line", "Signal Line", "Histogram"
+            );
+            println!("------------------------------------");
+            for point in data.points.iter().skip(500).take(10) {
+                println!(
+                    "{:<28} | {:<15.2} | {:<15.2} | {:<15.2}",
+                    point.timestamp, point.macd_line, point.signal_line, point.histogram
+                );
+            }
+            println!("------------------------------------");
+            println!("Total points calculated: {}", data.points.len());
         }
     }
     Ok(())

@@ -431,18 +431,15 @@ impl AnalyticsService for AnalyticsServiceHandler {
 
         let subject = format!("trades.*.{}", request.symbol.to_lowercase());
 
-        let mut subscription = self
+        let subscription = self
             .nats_client
             .subscribe(subject)
             .await
             .map_err(|e| Status::internal(format!("Error subscribing to subject: {}", e)))?;
-        let trade_stream = async_stream::stream! {
-            while let Some(msg) = subscription.next().await {
-                if let Ok(trade) = data::Trade::decode(&msg.payload[..]) {
-                    yield Ok(trade);
-                }
-            }
-        };
+        let trade_stream = subscription.map(|msg| {
+            data::Trade::decode(msg.payload)
+                .map_err(|e| Status::internal(format!("Failed to decode trade data: {}", e)))
+        });
 
         Ok(Response::new(Box::pin(trade_stream)))
     }
