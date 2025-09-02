@@ -31,7 +31,7 @@ impl From<data::trade::Exchange> for Exchange {
     }
 }
 
-impl From<i32> for Exchange {
+impl From<i32> for data::trade::Exchange {
     fn from(value: i32) -> Self {
         match value {
             0 => Self::Unknown,
@@ -50,11 +50,14 @@ struct Trade {
     exchange_timestamp: u64,
     /// nanoseconds
     ingestion_timestamp: Option<u64>,
-    exchange: Exchange,
+    exchange: String,
 }
 
 impl From<data::Trade> for Trade {
     fn from(value: data::Trade) -> Self {
+        let exchange: String = data::trade::Exchange::from(value.exchange)
+            .as_str_name()
+            .to_string();
         Self {
             symbol: value.symbol,
             price: value.price as f64,
@@ -67,7 +70,7 @@ impl From<data::Trade> for Trade {
 
                 seconds_as_nanos + nanos
             }),
-            exchange: value.exchange.into(),
+            exchange,
         }
     }
 }
@@ -79,7 +82,9 @@ impl From<Trade> for data::Trade {
             price: value.price,
             quantity: value.quantity,
             exchange_timestamp: value.exchange_timestamp,
-            exchange: value.exchange as i32,
+            exchange: data::trade::Exchange::from_str_name(&value.exchange)
+                .unwrap_or_default()
+                .into(),
             ingestion_timestamp: value.ingestion_timestamp.map(|t| prost_types::Timestamp {
                 seconds: t as i64 / 1_000_000_000,
                 nanos: (t % 1_000_000_000) as i32,
