@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Connected to Kafka brokers at {}", kafka_brokers);
 
     let nats_url = "nats://localhost:4222";
-    let nats_subject = "trades.binance.btcusdt";
+    let nats_subject = "trades.*.*";
     let nats_client = async_nats::connect(nats_url).await?;
 
     let mut subscription = nats_client.subscribe(nats_subject.to_string()).await?;

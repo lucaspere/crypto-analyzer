@@ -31,17 +31,6 @@ impl From<data::trade::Exchange> for Exchange {
     }
 }
 
-impl From<i32> for data::trade::Exchange {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => Self::Unknown,
-            1 => Self::Binance,
-            2 => Self::Coinbase,
-            _ => Self::Unknown,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize, Row)]
 struct Trade {
     symbol: String,
@@ -55,7 +44,8 @@ struct Trade {
 
 impl From<data::Trade> for Trade {
     fn from(value: data::Trade) -> Self {
-        let exchange: String = data::trade::Exchange::from(value.exchange)
+        let exchange: String = data::trade::Exchange::try_from(value.exchange)
+            .unwrap_or_default()
             .as_str_name()
             .to_string();
         Self {
