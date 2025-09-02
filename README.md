@@ -1,4 +1,4 @@
-# Analytics CLI Client
+# Analytics Technical Indicators
 
 A command-line interface client for the real-time cryptocurrency trade analytics system. This client allows you to request various financial indicators (VWAP, SMA, MACD) and subscribe to live trade data streams.
 
