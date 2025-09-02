@@ -12,5 +12,8 @@ prost-types = {workspace = true}
 datafusion = "49.0.2"
 serde = {workspace = true}
 clickhouse = {workspace = true}
+async-stream = {workspace = true}
+async-nats = {workspace = true}
+futures = {workspace = true}
 [build-dependencies]
 tonic-prost-build = "0.14.1"

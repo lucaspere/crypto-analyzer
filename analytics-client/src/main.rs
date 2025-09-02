@@ -6,7 +6,12 @@ pub mod analytics {
     tonic::include_proto!("analytics");
 }
 
-use crate::analytics::{GetMovingAverageRequest, GetTradeAnalyticsRequest};
+pub mod data {
+    tonic::include_proto!("data");
+}
+use crate::analytics::{
+    GetMovingAverageRequest, GetTradeAnalyticsRequest, SubscribeToTradesRequest,
+};
 use analytics::analytics_service_client::AnalyticsServiceClient;
 
 #[derive(Parser, Debug)]
@@ -26,7 +31,6 @@ enum Commands {
         #[arg(long)]
         end_timestamp: u64,
     },
-    /// Calcula a Média Móvel Simples (SMA) para um ativo
     Sma {
         #[arg(short, long)]
         symbol: String,
@@ -36,6 +40,10 @@ enum Commands {
         end_timestamp: u64,
         #[arg(short, long, default_value_t = 20)]
         window_size: u32,
+    },
+    Subscribe {
+        #[arg(short, long)]
+        symbol: String,
     },
 }
 
@@ -112,6 +120,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             println!("------------------------------------");
             println!("Total points calculated: {}", data.points.len());
+        }
+
+        Commands::Subscribe { symbol } => {
+            let request = tonic::Request::new(SubscribeToTradesRequest {
+                symbol: symbol.clone(),
+            });
+            println!("Subscribing to trades for symbol '{}'...", symbol);
+            let response = client.subscribe_to_trades(request).await?;
+            let mut data = response.into_inner();
+            while let Ok(Some(trade)) = data.message().await {
+                println!("Received trade: {:?}", trade);
+            }
+            println!("Stream closed!");
         }
     }
     Ok(())

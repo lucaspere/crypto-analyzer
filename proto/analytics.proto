@@ -1,11 +1,14 @@
 syntax = "proto3";
 
 package analytics;
+
 import "google/protobuf/timestamp.proto";
+import "trade.proto";
 
 service AnalyticsService {
     rpc GetTradeAnalytics(GetTradeAnalyticsRequest) returns (GetTradeAnalyticsResponse);
     rpc GetMovingAverage(GetMovingAverageRequest) returns (GetMovingAverageResponse);
+    rpc SubscribeToTrades(SubscribeToTradesRequest) returns (stream data.Trade);
 }
 
 message GetTradeAnalyticsRequest {
@@ -18,6 +21,10 @@ message GetTradeAnalyticsResponse {
     double total_volume_in_quotes = 1; // e.g: volume total in USDT
     double vwap = 2; // Medium price ponderated by volume
     uint64 trades_count = 3; // Total number of trades in the period
+}
+
+message SubscribeToTradesRequest {
+    string symbol = 1;
 }
 
 message GetMovingAverageRequest {

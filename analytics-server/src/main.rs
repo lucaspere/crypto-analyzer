@@ -1,27 +1,37 @@
 use std::sync::Arc;
 
+use async_nats::Client as AsyncNatsClient;
 use clickhouse::Client;
 use clickhouse::query::RowCursor;
 use datafusion::arrow::array::{
-    Array, Float64Array, Int64Array, RecordBatch, Time64MicrosecondArray, TimestampNanosecondArray,
+    Array, Float64Array, Int64Array, RecordBatch, TimestampNanosecondArray,
 };
 use datafusion::prelude::SessionContext;
-use tonic::{Request, Response, Status, transport::Server};
+use futures::StreamExt;
+use futures::stream::BoxStream;
+use prost::Message;
+use tonic::transport::Server;
+use tonic::{Request, Response, Status};
 
 mod analytics {
     tonic::include_proto!("analytics");
 }
+mod data {
+    tonic::include_proto!("data");
+}
 
-use analytics::analytics_service_server::{AnalyticsService, AnalyticsServiceServer};
+use analytics::analytics_service_server::AnalyticsService;
 use analytics::{
     GetMovingAverageRequest, GetMovingAverageResponse, GetTradeAnalyticsRequest,
-    GetTradeAnalyticsResponse,
+    GetTradeAnalyticsResponse, SubscribeToTradesRequest,
 };
 
 use crate::analytics::MovingAverageDataPoint;
+use crate::analytics::analytics_service_server::AnalyticsServiceServer;
 
 pub struct AnalyticsServiceHandler {
     clickhouse_client: Client,
+    nats_client: AsyncNatsClient,
 }
 
 impl AnalyticsServiceHandler {
@@ -213,7 +223,6 @@ impl AnalyticsService for AnalyticsServiceHandler {
             ));
         }
 
-        dbg!(&timestamps);
         let batch = RecordBatch::try_from_iter(vec![
             (
                 "timestamp",
@@ -250,7 +259,6 @@ impl AnalyticsService for AnalyticsServiceHandler {
             .await
             .map_err(|e| Status::internal(format!("Error collecting results: {}", e)))?;
 
-        dbg!(&results);
         let mut points = Vec::new();
         for result in results {
             let timestamp = result
@@ -278,19 +286,46 @@ impl AnalyticsService for AnalyticsServiceHandler {
 
         Ok(Response::new(GetMovingAverageResponse { points }))
     }
+
+    type SubscribeToTradesStream = BoxStream<'static, Result<data::Trade, Status>>;
+    async fn subscribe_to_trades(
+        &self,
+        request: Request<SubscribeToTradesRequest>,
+    ) -> Result<Response<BoxStream<'static, Result<data::Trade, Status>>>, Status> {
+        let request = request.into_inner();
+
+        let subject = format!("trades.*.{}", request.symbol.to_lowercase());
+
+        let mut subscription = self
+            .nats_client
+            .subscribe(subject)
+            .await
+            .map_err(|e| Status::internal(format!("Error subscribing to subject: {}", e)))?;
+        let x = async_stream::stream! {
+            while let Some(msg) = subscription.next().await {
+                if let Ok(trade) = data::Trade::decode(&msg.payload[..]) {
+                    yield Ok(trade);
+                }
+            }
+        };
+
+        Ok(Response::new(Box::pin(x)))
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:50051".parse()?;
+    let nats_url = "nats://localhost:4222";
+    let nats_client = async_nats::connect(nats_url).await?;
 
-    // Criamos o nosso cliente ClickHouse que será partilhado entre as requisições
     let client = Client::default()
         .with_url("http://localhost:8123")
         .with_database("default");
 
     let analytics_service = AnalyticsServiceHandler {
         clickhouse_client: client,
+        nats_client: nats_client,
     };
 
     let svc = AnalyticsServiceServer::new(analytics_service);
