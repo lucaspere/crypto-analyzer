@@ -1,0 +1,10 @@
+# Build the release version of the application
+build:
+    trunk build --release
+
+# Serve the application for development
+serve:
+    trunk serve
+
+# A simple alias for 'serve'
+dev: serve

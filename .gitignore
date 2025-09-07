@@ -1,3 +1,4 @@
 /target
 /clickhouse_data
 /.idea
+/analytics-frontend/dist

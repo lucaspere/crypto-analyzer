@@ -1,0 +1,54 @@
+[package]
+name = "analytics-frontend"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Yew framework
+yew = { version = "0.21", features = ["csr"] }
+yew-router = "0.18"
+
+# gRPC and protobuf - using workspace versions but with WASM-compatible features
+prost = {workspace = true}
+prost-types = {workspace = true}
+# tonic = {workspace = true}
+tonic-prost = {workspace = true}
+tower = "0.5.1"
+tonic-web = {workspace = true}
+# WebAssembly and web APIs
+wasm-bindgen-futures = "0.4"
+wasm-bindgen = "0.2.101"
+# tonic-web-wasm-client = "0.8.0"
+web-sys = "0.3"
+js-sys = "0.3"
+gloo = "0.11"
+gloo-timers = "0.3"
+futures-util = "0.3"
+hyper-util = "0.1.16"
+
+# HTTP client for gRPC-web - using WASM-compatible features
+reqwest = { version = "0.12.23", features = ["json", "rustls-tls-webpki-roots"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Time handling
+chrono = { version = "0.4", features = ["wasm-bindgen", "serde"] }
+
+# Logging
+log = "0.4"
+wasm-logger = "0.2"
+
+# UI styling - using Tailwind CSS via CDN instead
+
+[build-dependencies]
+prost-build = "0.14.1"
+

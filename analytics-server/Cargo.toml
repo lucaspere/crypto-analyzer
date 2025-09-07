@@ -15,5 +15,7 @@ clickhouse = {workspace = true}
 async-stream = {workspace = true}
 async-nats = {workspace = true}
 futures = {workspace = true}
+tonic-web = "0.14.1"
+tower-http = { version = "0.5", features = ["cors"] }
 [build-dependencies]
 tonic-prost-build = "0.14.1"

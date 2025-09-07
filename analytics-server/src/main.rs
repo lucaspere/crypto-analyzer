@@ -12,6 +12,8 @@ use futures::stream::BoxStream;
 use prost::Message;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
+use tonic_web::GrpcWebLayer;
+use tower_http::cors::CorsLayer;
 
 mod analytics {
     tonic::include_proto!("analytics");
@@ -514,7 +516,7 @@ impl AnalyticsService for AnalyticsServiceHandler {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
+    let addr = "[::]:50051".parse()?;
     let nats_url = "nats://localhost:4222";
     let nats_client = async_nats::connect(nats_url).await?;
 
@@ -529,9 +531,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let svc = AnalyticsServiceServer::new(analytics_service);
 
+    let cors = CorsLayer::permissive();
+
     println!("AnalyticsServer listening on {}", addr);
 
-    Server::builder().add_service(svc).serve(addr).await?;
+    Server::builder()
+        .accept_http1(true)
+        .layer(cors)
+        .layer(GrpcWebLayer::new())
+        .add_service(svc)
+        .serve(addr)
+        .await?;
 
     Ok(())
 }

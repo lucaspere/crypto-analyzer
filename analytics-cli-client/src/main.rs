@@ -184,6 +184,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
             let response = client.get_macd(request).await?;
             let data = response.into_inner();
+            dbg!(&data);
             println!("\n✅ MACD Analysis Complete! (showing first 10 points)");
             println!("------------------------------------");
             println!(

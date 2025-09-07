@@ -1,21 +1,22 @@
 [workspace]
-members = ["analytics-cli-client", "analytics-server", "clickhouse_sink","feed-handler", "nats-checker", "nats_to_kafka_bridge"]
+members = ["analytics-cli-client", "analytics-server", "analytics-frontend", "clickhouse_sink","feed-handler", "nats-checker", "nats_to_kafka_bridge"]
 resolver = "2"
 version = "0.1.0"
 
 [workspace.dependencies]
-tokio = {version = "1.47.1", features = ["full"]}
+tokio = {version = "1.47.1", default-features = false, features = ["rt-multi-thread", "fs", "time"]}
 serde = {version = "1.0.219", features = ["derive"]}
 
 futures-util = "0.3.31"
 serde_json = "1.0.143"
 async-nats = "0.42.0"
-rdkafka = { version = "0.38.0", features = ["tokio", "cmake-build"] }
+rdkafka = { version = "0.38.0", default-features = false, features = ["tokio", "cmake-build"] }
 clickhouse = "0.13.3"
-prost = "0.14.1"
-tonic = "0.14.1"
-tonic-prost = "0.14.1"
-prost-types = "0.14.1"
+prost = {version = "0.14.1", default-features = false}
+tonic = {version = "0.14.1", default-features = false, features = ["codegen", "transport", "router"]}
+tonic-prost = {version = "0.14.2", default-features = false}
+prost-types = {version = "0.14.1", default-features = false}
+tonic-web = {version = "0.14.1", default-features = false}
 chrono = "0.4.41"
 async-stream = "0.3.6"
 futures = "0.3.31"
